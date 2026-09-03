@@ -79,6 +79,20 @@
         button:active {
             transform: translateY(0);
         }
+        .clear-btn {
+            background: transparent;
+            color: #d6336c;
+            border: 2px dashed #f8a5c2;
+            font-size: 0.8rem;
+            padding: 0.4rem 0.9rem;
+            margin-top: 1rem;
+            box-shadow: none;
+        }
+        .clear-btn:hover {
+            background: #fff0f4;
+            transform: none;
+            box-shadow: none;
+        }
         #queue {
             margin-top: 1rem;
             text-align: left;
@@ -127,37 +141,99 @@
             <p class="empty-msg">— ยังไม่มีคิว —</p>
         </div>
         <div class="counter" id="counter">👤 จำนวนในคิว: 0</div>
+        <button class="clear-btn" onclick="clearQueue()">🗑️ ล้างคิวทั้งหมด</button>
     </div>
 
     <script>
-        function add() {
-            let name = document.getElementById("name").value.trim();
+        // ---- เพิ่มคิว: ส่งชื่อไปให้เซิร์ฟเวอร์บันทึกลงไฟล์ queue.txt ----
+        async function add() {
+            const name = document.getElementById("name").value.trim();
             if (!name) {
                 alert("⚠️ กรุณากรอกชื่อก่อนเพิ่มคิว");
                 return;
             }
-            let queue = document.getElementById("queue");
-            // Remove empty message if present
-            let empty = queue.querySelector(".empty-msg");
-            if (empty) empty.remove();
+            try {
+                const res = await fetch("/api/queue", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name })
+                });
+                const data = await parseRes(res);
+                if (!res.ok) {
+                    alert("⚠️ " + (data.error || "บันทึกคิวไม่สำเร็จ"));
+                    return;
+                }
+                document.getElementById("name").value = "";
+                document.getElementById("name").focus();
+                renderQueue(data.queue);
+            } catch (err) {
+                alert("⚠️ เกิดข้อผิดพลาด: " + err.message);
+            }
+        }
 
-            queue.innerHTML += `<p>${escapeHtml(name)}</p>`;
-            document.getElementById("name").value = "";
-            document.getElementById("name").focus();
+        // ---- โหลดคิวเดิมจากไฟล์ queue.txt ตอนเปิดหน้าเว็บ ----
+        async function loadQueue() {
+            try {
+                const res = await fetch("/api/queue");
+                const queue = await res.json();
+                renderQueue(queue);
+            } catch (err) {
+                document.getElementById("queue").innerHTML =
+                    '<p class="empty-msg">⚠️ ไม่สามารถโหลดคิวจากเซิร์ฟเวอร์ได้<br>กรุณารันด้วย "node server.js"</p>';
+            }
+        }
+
+        function renderQueue(queue) {
+            const container = document.getElementById("queue");
+            container.innerHTML = "";
+            if (!queue.length) {
+                container.innerHTML = '<p class="empty-msg">— ยังไม่มีคิว —</p>';
+            } else {
+                queue.forEach((name, i) => {
+                    const p = document.createElement("p");
+                    p.textContent = `คิวที่ ${i + 1}: ${name}`;
+                    container.appendChild(p);
+                });
+            }
             updateCounter();
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement("div");
-            div.textContent = text;
-            return div.innerHTML;
+        // แปลง response เป็น JSON แต่ถ้าไม่ใช่ JSON ก็คืน error text กลับไป
+        async function parseRes(res) {
+            const text = await res.text();
+            try { return JSON.parse(text); } catch { return { error: text }; }
+        }
+
+        // ---- ล้างคิวทั้งหมด (ลบข้อมูลในไฟล์ queue.txt ด้วย) ----
+        async function clearQueue() {
+            if (!confirm("🗑️ ยืนยันล้างคิวทั้งหมดใช่หรือไม่?")) return;
+            try {
+                const res = await fetch("/api/queue/clear", { method: "POST" });
+                const data = await parseRes(res);
+                if (!res.ok) {
+                    alert("⚠️ " + (data.error || "ล้างคิวไม่สำเร็จ"));
+                    return;
+                }
+                renderQueue(data.queue);
+                document.getElementById("name").focus();
+            } catch (err) {
+                alert("⚠️ เกิดข้อผิดพลาด: " + err.message);
+            }
         }
 
         function updateCounter() {
-            let items = document.querySelectorAll("#queue p");
+            const items = document.querySelectorAll("#queue p:not(.empty-msg)");
             document.getElementById("counter").textContent =
                 `👤 จำนวนในคิว: ${items.length}`;
         }
+
+        // กด Enter ในช่องชื่อ = เพิ่มคิว
+        document.getElementById("name").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") add();
+        });
+
+        // โหลดคิวเดิมจากไฟล์เมื่อเปิดหน้าเว็บ
+        loadQueue();
     </script>
 </body>
 </html>

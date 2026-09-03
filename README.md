@@ -11,9 +11,11 @@
 | ➕ **เพิ่มคิว** | กรอกชื่อผู้ป่วยแล้วกดปุ่มเพิ่มคิว |
 | 📋 **แสดงคิว** | รายชื่อแสดงแบบเรียงลำดับ พร้อมไอคอน 🩺 |
 | 🔢 **นับจำนวนคิว** | แสดงจำนวนผู้ป่วยที่รออยู่ในคิวแบบ Real-time |
+| 💾 **บันทึกอัตโนมัติ** | เพิ่มคิวแล้วเซิร์ฟเวอร์จะบันทึกลงไฟล์ `queue.txt` ทันที — รีเฟรช/เปิดใหม่ข้อมูลยังอยู่ |
+| 🗑️ **ล้างคิว** | ปุ่มล้างคิวทั้งหมด (ลบข้อมูลใน `queue.txt` ด้วย) |
 | 🎨 **โทนสีชมพู** | UI สวยงามด้วยเฉดสีชมพูพาสเทล |
 | ✨ **แอนิเมชัน** | รายการคิวเลื่อนเข้าพร้อม fade-in effect |
-| 🛡️ **ความปลอดภัย** | ป้องกัน XSS ด้วย `escapeHtml()` |
+| 🛡️ **ความปลอดภัย** | ป้องกัน XSS ด้วยการสร้าง element ผ่าน `textContent` |
 
 ---
 
@@ -38,10 +40,16 @@
 
 ## 🚀 วิธีใช้งาน
 
-1. **เปิดไฟล์** `index.html` ในเว็บเบราว์เซอร์ (Chrome, Edge, Safari ฯลฯ)
-2. **พิมพ์ชื่อผู้ป่วย** ในช่องกรอกข้อความ
-3. **คลิกปุ่ม "➕ เพิ่มคิว"** หรือกด Enter
-4. รายชื่อจะแสดงในคิวทันที พร้อมนับจำนวนอัตโนมัติ ✅
+1. **รันเว็บเซิร์ฟเวอร์ด้วย Node.js** (ไม่ต้องติดตั้ง package เพิ่มเติม):
+
+   ```bash
+   node server.js
+   ```
+
+2. **เปิดเบราว์เซอร์** ไปที่ **http://localhost:3000**
+3. **พิมพ์ชื่อผู้ป่วย** ในช่องกรอกข้อความ
+4. **คลิกปุ่ม "➕ เพิ่มคิว"** หรือกด Enter
+5. ✅ คิวจะถูก **บันทึกลงไฟล์ `queue.txt` ทันที** — ต่อให้รีเฟรชหรือปิดเปิดหน้าเว็บ ข้อมูลคิวยังอยู่ครบ
 
 ---
 
@@ -50,9 +58,10 @@
 - ![HTML5](https://img.shields.io/badge/-HTML5-E34F26?style=flat&logo=html5&logoColor=white)
 - ![CSS3](https://img.shields.io/badge/-CSS3-1572B6?style=flat&logo=css3&logoColor=white)
 - ![JavaScript](https://img.shields.io/badge/-JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
+- ![Node.js](https://img.shields.io/badge/-Node.js-339933?style=flat&logo=node.js&logoColor=white)
 - ![Git](https://img.shields.io/badge/-Git-F05032?style=flat&logo=git&logoColor=white)
 
-> 💡 **Vanilla JS ล้วน ๆ** — ไม่ต้องพึ่งพา framework หรือ library ใด ๆ
+> 💡 **Vanilla JS + Node.js ล้วน ๆ** — ไม่ต้องพึ่งพา framework หรือ library ใด ๆ
 
 ---
 
@@ -61,6 +70,8 @@
 ```
 📂 hospital-queue-system/
 ├── 📄 index.html        # 🌸 หน้าเว็บหลัก (โทนสีชมพู)
+├── 📄 server.js         # 🚀 เว็บเซิร์ฟเวอร์ + API จัดการคิว (Node.js)
+├── 📄 queue.txt         # 💾 ไฟล์บันทึกข้อมูลคิว (สร้างอัตโนมัติเมื่อเพิ่มคิว)
 ├── 📄 README.md         # 📖 ไฟล์คำอธิบายโปรเจกต์
 ├── 📄 CLAUDE.md         # 🤖 บันทึกความต้องการจาก Claude
 ├── 📄 LICENSE           # 📜 สัญญาอนุญาต (MIT)
