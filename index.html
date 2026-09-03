@@ -1,18 +1,163 @@
 <!DOCTYPE html>
-<html>
-<head><title>คิว</title></head>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>🌸 ระบบคิวโรงพยาบาล</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'Sarabun', sans-serif;
+            background: linear-gradient(135deg, #ffe4ec 0%, #ffb6c1 50%, #ff91a4 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 2rem;
+            padding: 2.5rem;
+            box-shadow: 0 12px 40px rgba(255, 105, 135, 0.25);
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+        h1 {
+            color: #d6336c;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(214, 51, 108, 0.15);
+        }
+        .subtitle {
+            color: #f06595;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.5px;
+        }
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid #f8a5c2;
+            border-radius: 1rem;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            background: #fff5f9;
+        }
+        input[type="text"]:focus {
+            border-color: #d6336c;
+            box-shadow: 0 0 0 4px rgba(214, 51, 108, 0.15);
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #f06595, #d6336c);
+            color: #fff;
+            border: none;
+            border-radius: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(214, 51, 108, 0.35);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        #queue {
+            margin-top: 1rem;
+            text-align: left;
+        }
+        #queue p {
+            background: #fff5f9;
+            border-left: 4px solid #d6336c;
+            padding: 0.65rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            color: #862e4b;
+            font-size: 1rem;
+            animation: fadeIn 0.3s ease;
+        }
+        #queue p::before {
+            content: "🩺 ";
+        }
+        .empty-msg {
+            color: #f06595;
+            font-style: italic;
+            text-align: center;
+            padding: 1rem;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .counter {
+            color: #d6336c;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
 <body>
-<h1>คิว</h1>
-<input id="name" placeholder="ชื่อ">
-<button onclick="add()">เพิ่ม</button>
-<div id="queue"></div>
-<script>
-function add() {
-    let name = document.getElementById("name").value;
-    if (!name) return;
-    document.getElementById("queue").innerHTML += `<p>${name}</p>`;
-    document.getElementById("name").value = "";
-}
-</script>
+    <div class="container">
+        <h1>🌸 ระบบคิว</h1>
+        <p class="subtitle">โรงพยาบาลสีชมพู ✨</p>
+
+        <div class="input-group">
+            <input id="name" type="text" placeholder="กรุณากรอกชื่อผู้ป่วย...">
+            <button onclick="add()">➕ เพิ่มคิว</button>
+        </div>
+
+        <div id="queue">
+            <p class="empty-msg">— ยังไม่มีคิว —</p>
+        </div>
+        <div class="counter" id="counter">👤 จำนวนในคิว: 0</div>
+    </div>
+
+    <script>
+        function add() {
+            let name = document.getElementById("name").value.trim();
+            if (!name) {
+                alert("⚠️ กรุณากรอกชื่อก่อนเพิ่มคิว");
+                return;
+            }
+            let queue = document.getElementById("queue");
+            // Remove empty message if present
+            let empty = queue.querySelector(".empty-msg");
+            if (empty) empty.remove();
+
+            queue.innerHTML += `<p>${escapeHtml(name)}</p>`;
+            document.getElementById("name").value = "";
+            document.getElementById("name").focus();
+            updateCounter();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateCounter() {
+            let items = document.querySelectorAll("#queue p");
+            document.getElementById("counter").textContent =
+                `👤 จำนวนในคิว: ${items.length}`;
+        }
+    </script>
 </body>
 </html>
