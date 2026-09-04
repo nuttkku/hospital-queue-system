@@ -1,6 +1,6 @@
 # 🏥 Hospital Queue System
 
-> 🌸 ระบบคิวโรงพยาบาลโทนสีชมพู — เรียบง่าย สวยงาม ใช้งานง่าย
+> 🌸 ระบบคิวโรงพยาบาลโทนสีชมพู — เรียบง่าย สวยงาม ใช้งานง่าย รันด้วย **Docker** และจัดเก็บข้อมูลด้วย **MariaDB**
 
 ---
 
@@ -11,10 +11,11 @@
 | ➕ **เพิ่มคิว** | กรอกชื่อผู้ป่วยแล้วกดปุ่มเพิ่มคิว → เข้าสถานะ "🕐 รอตรวจ" |
 | 🚶 **สถานะการตรวจ** | กด **เริ่มตรวจ ▶** → ย้ายไป "🩺 กำลังตรวจ" / กด **ตรวจเสร็จ ✓** → ย้ายไป "✅ ตรวจเสร็จ" |
 | 📋 **กระดาน 3 คอลัมน์** | แสดงคิวแยกตามสถานะแบบ Real-time พร้อมตัวนับจำนวนแต่ละสถานะ |
-| 💾 **บันทึกลงไฟล์ .txt** | ข้อมูลถูกบันทึกคนละไฟล์ตามสถานะ (`queue.txt`, `checking.txt`, `done.txt`) — รีเฟรช/ปิดเปิดใหม่ข้อมูลยังอยู่ |
+| 🗄️ **บันทึกลง MariaDB** | ข้อมูลถูกเก็บในฐานข้อมูล MariaDB ที่แยก container (`db`) — รีเฟรช/ปิดเปิดใหม่ข้อมูลยังอยู่ และอยู่รอดแม้ rebuild container |
+| 🐳 **รันด้วย Docker** | แยกเป็น 2 container (`db` + `frontend`) รันด้วยคำสั่งเดียว |
 | 🗑️ **ล้างข้อมูล** | ปุ่มล้างคิวที่รอตรวจ หรือล้างข้อมูลทุกสถานะ (มี confirm ก่อนลบ) |
 | 🎨 **โทนสีชมพู** | UI สวยงามด้วยเฉดสีชมพูพาสเทล |
-| 🛡️ **ความปลอดภัย** | ป้องกัน XSS ด้วยการสร้าง element ผ่าน `textContent` |
+| 🛡️ **ความปลอดภัย** | ป้องกัน XSS ด้วยการสร้าง element ผ่าน `textContent` และกัน SQL Injection ด้วย SQL parameter |
 
 ---
 
@@ -35,10 +36,18 @@
 
 ## 🚀 วิธีใช้งาน
 
-1. **รันเว็บเซิร์ฟเวอร์ด้วย Node.js** (ไม่ต้องติดตั้ง package เพิ่มเติม):
+### 🐳 รันด้วย Docker (แนะนำ)
+
+1. **สร้างและรันทั้ง 2 container** (`db` = MariaDB, `frontend` = Node.js เสิร์ฟหน้าเว็บ + API):
 
    ```bash
-   node server.js
+   docker compose up --build
+   ```
+
+   หรือรันแบบ background:
+
+   ```bash
+   docker compose up -d --build
    ```
 
 2. **เปิดเบราว์เซอร์** ไปที่ **http://localhost:3000**
@@ -46,7 +55,29 @@
 4. **คลิกปุ่ม "➕ เพิ่มคิว"** หรือกด Enter → คนไข้เข้าสถานะ **รอตรวจ** ทันที
 5. เมื่อถึงคิว กด **"เริ่มตรวจ ▶"** → คนไข้ย้ายไปสถานะ **กำลังตรวจ**
 6. ตรวจเสร็จแล้วกด **"✓ ตรวจเสร็จ"** → คนไข้ย้ายไปสถานะ **ตรวจเสร็จ**
-7. ✅ ข้อมูลทั้งหมดถูกบันทึกลงไฟล์ .txt แยกตามสถานะทันที — ต่อให้รีเฟรชหรือปิดเปิดหน้าเว็บ ข้อมูลยังอยู่ครบ
+7. ✅ ข้อมูลทั้งหมดถูกบันทึกลง **MariaDB** แบบ Real-time — ต่อให้รีเฟรชหรือปิดเปิดหน้าเว็บ ข้อมูลยังอยู่ครบ
+
+### 🛑 หยุดการทำงาน
+
+```bash
+docker compose down        # หยุด container (ข้อมูลใน volume db_data ยังอยู่)
+docker compose down -v     # หยุด + ลบ volume ข้อมูลทั้งหมด
+```
+
+### 🔍 ตรวจสอบ container / ดูข้อมูลในฐานข้อมูล
+
+```bash
+docker compose ps                                  # ดูสถานะ container ทั้ง 2
+docker compose exec db mariadb -u queue_user -pqueue_pass hospital_queue -e "SELECT id, name, status FROM patients ORDER BY seq;"
+```
+
+### 💻 รันแบบไม่ใช้ Docker (สำหรับพัฒนา)
+
+ต้องมี MariaDB/MySQL เปิดอยู่แล้ว จากนั้นกำหนดค่า connection ผ่าน environment:
+
+```bash
+DB_HOST=127.0.0.1 DB_USER=queue_user DB_PASSWORD=queue_pass DB_NAME=hospital_queue node server.js
+```
 
 ---
 
@@ -56,9 +87,29 @@
 - ![CSS3](https://img.shields.io/badge/-CSS3-1572B6?style=flat&logo=css3&logoColor=white)
 - ![JavaScript](https://img.shields.io/badge/-JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
 - ![Node.js](https://img.shields.io/badge/-Node.js-339933?style=flat&logo=node.js&logoColor=white)
-- ![Git](https://img.shields.io/badge/-Git-F05032?style=flat&logo=git&logoColor=white)
+- ![MariaDB](https://img.shields.io/badge/-MariaDB-003545?style=flat&logo=mariadb&logoColor=white)
+- ![Docker](https://img.shields.io/badge/-Docker-2496ED?style=flat&logo=docker&logoColor=white)
 
-> 💡 **Vanilla JS + Node.js ล้วน ๆ** — ไม่ต้องพึ่งพา framework หรือ library ใด ๆ
+> 💡 **Vanilla JS + Node.js ล้วน ๆ** — ฝั่งเว็บไม่พึ่งพา framework ใด ๆ ส่วนการเชื่อมต่อ MariaDB ใช้ package `mysql2`
+
+---
+
+## 🏗️ สถาปัตยกรรม (Docker)
+
+```
+┌───────────────────────────  docker compose  ───────────────────────────┐
+│                                                                        │
+│   ┌────────────────────────────┐        ┌────────────────────────────┐ │
+│   │   container: frontend       │        │   container: db            │ │
+│   │   ─────────────────────     │        │   ─────────────────────     │ │
+│   │   Node.js (server.js)       │        │   MariaDB 11.4             │ │
+│   │   • เสิร์ฟ index.html        │        │   • ตาราง patients         │ │
+│   │   • REST API /api/queue/*   │ ─────▶ │   • ตาราง queue_seq        │ │
+│   │                            │  :3306  │   volume: db_data          │ │
+│   └────────────────────────────┘        └────────────────────────────┘ │
+│   http://localhost:3000                     (ข้อมูลอยู่รอดทุก rebuild)   │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -66,16 +117,18 @@
 
 ```
 📂 hospital-queue-system/
-├── 📄 index.html        # 🌸 หน้าเว็บหลัก (กระดานคิว + สถานะการตรวจ)
-├── 📄 server.js         # 🚀 เว็บเซิร์ฟเวอร์ + API จัดการคิวและสถานะ (Node.js)
-├── 📄 queue.txt         # 🕐 ไฟล์สถานะ "รอตรวจ" (สร้างอัตโนมัติเมื่อเพิ่มคิว)
-├── 📄 checking.txt      # 🩺 ไฟล์สถานะ "กำลังตรวจ"
-├── 📄 done.txt          # ✅ ไฟล์สถานะ "ตรวจเสร็จ"
-├── 📄 README.md         # 📖 ไฟล์คำอธิบายโปรเจกต์
-├── 📄 CLAUDE.md         # 🤖 บันทึกความต้องการจาก Claude
-├── 📄 LICENSE           # 📜 สัญญาอนุญาต (MIT)
-├── 📄 .gitattributes    # ⚙️ กำหนดค่า Git attributes
-└── 📄 .gitignore        # 🙈 ไฟล์ที่ Git ไม่ต้องติดตาม
+├── 📄 index.html            # 🌸 หน้าเว็บหลัก (กระดานคิว + สถานะการตรวจ)
+├── 📄 server.js             # 🚀 เว็บเซิร์ฟเวอร์ + API (อยู่ใน container frontend)
+├── 📄 db.js                 # 🗄️ ชั้นเชื่อมต่อ/คิวรีกับ MariaDB (แทนการเขียนไฟล์ .txt)
+├── 📄 package.json          # 📦 รายการ dependency (mysql2)
+├── 📄 Dockerfile            # 🐳 สร้าง image ของ container frontend
+├── 📄 docker-compose.yml    # 🐳 ประกาศ container db + frontend (แยกกัน)
+├── 📄 .dockerignore         # 🙈 ไฟล์ที่ไม่ต้องคัดลอกเข้า image
+├── 📄 README.md             # 📖 ไฟล์คำอธิบายโปรเจกต์
+├── 📄 CLAUDE.md             # 🤖 บันทึกความต้องการจาก Claude
+├── 📄 LICENSE               # 📜 สัญญาอนุญาต (MIT)
+├── 📄 .gitattributes        # ⚙️ กำหนดค่า Git attributes
+└── 📄 .gitignore            # 🙈 ไฟล์ที่ Git ไม่ต้องติดตาม
 ```
 
 ---
@@ -93,4 +146,4 @@
 
 ---
 
-> 🌷 **Made with 💖 and lots of pink colors!**
+> 🌷 **Made with 💖, lots of pink colors, Docker 🐳 and MariaDB 🗄️!**

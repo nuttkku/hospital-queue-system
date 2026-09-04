@@ -1,0 +1,28 @@
+# Git
+.git
+.gitattributes
+.gitignore
+
+# เอกสารที่ไม่ต้องลง image
+README.md
+CLAUDE.md
+LICENSE
+
+# Node
+node_modules
+npm-debug.log*
+*.log
+
+# ข้อมูล runtime เก่ารูปแบบไฟล์ (ถูกแทนที่ด้วย MariaDB แล้ว)
+queue.txt
+checking.txt
+done.txt
+
+# Environment
+.env
+.env.*
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore

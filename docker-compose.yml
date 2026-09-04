@@ -1,0 +1,58 @@
+# 🌸 Hospital Queue System — รันด้วย 2 container แยกกัน
+#   db        : MariaDB (เก็บข้อมูล)
+#   frontend  : Node.js เสิร์ฟหน้าเว็บ + REST API
+#
+# เริ่มต้น:  docker compose up -d --build
+# หยุด:      docker compose down          (ข้อมูลใน volume ยังอยู่)
+# ลบข้อมูล:  docker compose down -v
+services:
+  db:
+    image: mariadb:11.4
+    container_name: hospital-queue-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-queue_root_pass}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-hospital_queue}
+      MARIADB_USER: ${MARIADB_USER:-queue_user}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-queue_pass}
+    # ข้อมูลจริงอยู่ใน Docker volume (ไม่อยู่ใน container -> อยู่รอดแม้ rebuild)
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - queue-net
+    # หากต้องการเข้าถึง MariaDB จากภายนอก (เช่น ใช้ GUI ดูข้อมูล) ให้แกะคอมเมนต์:
+    # ports:
+    #   - "3306:3306"
+
+  frontend:
+    build: .
+    image: hospital-queue-frontend:latest
+    container_name: hospital-queue-frontend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${MARIADB_USER:-queue_user}
+      DB_PASSWORD: ${MARIADB_PASSWORD:-queue_pass}
+      DB_NAME: ${MARIADB_DATABASE:-hospital_queue}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    networks:
+      - queue-net
+
+volumes:
+  db_data:
+
+networks:
+  queue-net:
+    driver: bridge

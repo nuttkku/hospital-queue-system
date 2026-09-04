@@ -235,7 +235,7 @@
     </div>
 
     <script>
-        // ---------- เพิ่มคิวใหม่ (สถานะเริ่มต้น: รอตรวจ -> queue.txt) ----------
+        // ---------- เพิ่มคิวใหม่ (สถานะเริ่มต้น: รอตรวจ) ----------
         async function add() {
             const name = document.getElementById("name").value.trim();
             if (!name) {
@@ -287,7 +287,7 @@
                 render(await res.json());
             } catch (err) {
                 document.getElementById("list-waiting").innerHTML =
-                    '<div class="empty">⚠️ โหลดข้อมูลไม่สำเร็จ<br>กรุณารัน "node server.js"</div>';
+                    '<div class="empty">⚠️ โหลดข้อมูลไม่สำเร็จ<br>กรุณารัน "docker compose up"</div>';
             }
         }
 
@@ -337,7 +337,7 @@
             });
         }
 
-        // ---------- ล้างคิวที่รอตรวจ (เฉพาะ queue.txt) ----------
+        // ---------- ล้างคิวที่รอตรวจ ----------
         async function clearWaiting() {
             if (!confirm("🗑️ ยืนยันล้างคิวที่ยังรอตรวจทั้งหมด?")) return;
             await callClear("/api/queue/clear", "ล้างคิวไม่สำเร็จ");
@@ -375,7 +375,7 @@
             if (e.key === "Enter") add();
         });
 
-        // โหลดข้อมูลจากไฟล์เมื่อเปิดหน้าเว็บ
+        // โหลดข้อมูลจาก MariaDB เมื่อเปิดหน้าเว็บ
         loadQueue();
     </script>
 </body>

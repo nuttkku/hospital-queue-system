@@ -1,0 +1,16 @@
+{
+  "name": "hospital-queue-system",
+  "version": "2.0.0",
+  "description": "🌸 ระบบคิวโรงพยาบาลโทนสีชมพู — รันด้วย Docker + จัดเก็บข้อมูลด้วย MariaDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0"
+  },
+  "license": "MIT"
+}
