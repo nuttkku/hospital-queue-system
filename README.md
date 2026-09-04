@@ -1,6 +1,6 @@
 # 🏥 Hospital Queue System
 
-> 🌸 ระบบคิวโรงพยาบาลโทนสีชมพู — เรียบง่าย สวยงาม ใช้งานง่าย รันด้วย **Docker** และจัดเก็บข้อมูลด้วย **MariaDB**
+> 🌸 ระบบคิวโรงพยาบาลโทนสีชมพู — เข้าใช้งานด้วยบัญชีและสิทธิ์ตามบทบาท (RBAC) รันด้วย **Docker** จัดเก็บข้อมูลด้วย **MariaDB** — Frontend **Vue 3** + Backend **Express.js**
 
 ---
 
@@ -8,29 +8,31 @@
 
 | ฟีเจอร์ | รายละเอียด |
 |--------|------------|
-| ➕ **เพิ่มคิว** | กรอกชื่อผู้ป่วยแล้วกดปุ่มเพิ่มคิว → เข้าสถานะ "🕐 รอตรวจ" |
-| 🚶 **สถานะการตรวจ** | กด **เริ่มตรวจ ▶** → ย้ายไป "🩺 กำลังตรวจ" / กด **ตรวจเสร็จ ✓** → ย้ายไป "✅ ตรวจเสร็จ" |
-| 📋 **กระดาน 3 คอลัมน์** | แสดงคิวแยกตามสถานะแบบ Real-time พร้อมตัวนับจำนวนแต่ละสถานะ |
-| 🗄️ **บันทึกลง MariaDB** | ข้อมูลถูกเก็บในฐานข้อมูล MariaDB ที่แยก container (`db`) — รีเฟรช/ปิดเปิดใหม่ข้อมูลยังอยู่ และอยู่รอดแม้ rebuild container |
-| 🐳 **รันด้วย Docker** | แยกเป็น 2 container (`db` + `frontend`) รันด้วยคำสั่งเดียว |
-| 🗑️ **ล้างข้อมูล** | ปุ่มล้างคิวที่รอตรวจ หรือล้างข้อมูลทุกสถานะ (มี confirm ก่อนลบ) |
+| 🔐 **Login / RBAC** | เข้าสู่ระบบด้วย JWT (httpOnly cookie) แบ่ง 3 บทบาท: **admin** / **receptionist** / **doctor** |
+| 🛡️ **บังคับ 2FA (TOTP)** | ทุกบัญชีต้องยืนยัน 2FA ด้วย Google Authenticator (QR + secret เข้ารหัส AES-256-GCM) + Backup codes — ต่อให้รู้รหัสผ่านก็เข้าไม่ได้ถ้าไม่มี 2FA |
+| ➕ **เพิ่มคิว** | เจ้าหน้าที่รับคิว/admin กรอกชื่อผู้ป่วย → สถานะ "🕐 รอตรวจ" |
+| 🚶 **เลื่อนสถานะ** | แพทย์/admin กด **เริ่มตรวจ ▶** / **ตรวจเสร็จ ✓** |
+| 👥 **จัดการผู้ใช้** | admin สร้าง/แก้ไข/ลบผู้ใช้ เปลี่ยนบทบาท และรีเซ็ตรหัสผ่านได้ |
+| 📋 **กระดาน 3 คอลัมน์** | แสดงคิวแยกสถานะ Real-time (refresh อัตโนมัติทุก 5 วินาที) พร้อมตัวนับ |
+| 🗄️ **MariaDB** | เก็บข้อมูลใน container `db` (volume `db_data` อยู่รอดทุก rebuild) |
+| 🐳 **Docker** | แยก 2 container: `db` (MariaDB) + `frontend` (Express + Vue) |
 | 🎨 **โทนสีชมพู** | UI สวยงามด้วยเฉดสีชมพูพาสเทล |
-| 🛡️ **ความปลอดภัย** | ป้องกัน XSS ด้วยการสร้าง element ผ่าน `textContent` และกัน SQL Injection ด้วย SQL parameter |
+| 🛡️ **ปลอดภัย** | รหัสผ่านเข้ารหัส bcrypt, กัน SQL Injection ด้วย parameter, Vue escape ป้องกัน XSS |
 
 ---
 
-## 🖼️ หน้าตาโปรเจกต์
+## 👑 บทบาทและสิทธิ์ (RBAC)
 
-```
-┌─────────────────────────────────────────────────────┐
-│              🌸 ระบบคิวโรงพยาบาล                      │
-│         [กรุณากรอกชื่อผู้ป่วย...] ➕ เพิ่มคิว           │
-├──────────────┬──────────────┬──────────────────────┤
-│ 🕐 รอตรวจ     │ 🩺 กำลังตรวจ   │ ✅ ตรวจเสร็จ           │
-│ #1 คนไข้ ก ▶ │ #1 คนไข้ ข ✓  │ #1 คนไข้ ค            │
-│ #2 คนไข้ ง ▶ │              │                      │
-└──────────────┴──────────────┴──────────────────────┘
-```
+| ความสามารถ | admin | receptionist (เจ้าหน้าที่รับคิว) | doctor (แพทย์) |
+|---|:---:|:---:|:---:|
+| ดูกระดานคิว | ✅ | ✅ | ✅ |
+| เพิ่มคิว | ✅ | ✅ | ❌ |
+| ล้างคิวที่รอตรวจ | ✅ | ✅ | ❌ |
+| เริ่มตรวจ / ตรวจเสร็จ (เลื่อนสถานะ) | ✅ | ❌ | ✅ |
+| ล้างข้อมูลทุกสถานะ | ✅ | ❌ | ❌ |
+| จัดการผู้ใช้ (สร้าง/แก้/ลบ) | ✅ | ❌ | ❌ |
+
+> 💡 สิทธิ์บังคับทั้งที่ **Frontend** (ซ่อนปุ่ม/เมนู) และ **Backend** (middleware `allowRoles`) — bypass ผ่าน API ไม่ได้
 
 ---
 
@@ -38,98 +40,151 @@
 
 ### 🐳 รันด้วย Docker (แนะนำ)
 
-1. **สร้างและรันทั้ง 2 container** (`db` = MariaDB, `frontend` = Node.js เสิร์ฟหน้าเว็บ + API):
+```bash
+docker compose up -d --build
+```
 
-   ```bash
-   docker compose up --build
-   ```
+เปิด **http://localhost:3000** แล้วเข้าสู่ระบบด้วยบัญชีเริ่มต้น:
 
-   หรือรันแบบ background:
+| บทบาท | ชื่อผู้ใช้ | รหัสผ่าน |
+|--------|-----------|----------|
+| 👑 ผู้ดูแลระบบ | `admin` | `admin123` |
+| 🖥️ เจ้าหน้าที่รับคิว | `receptionist` | `reception123` |
+| 🩺 แพทย์ | `doctor` | `doctor123` |
 
-   ```bash
-   docker compose up -d --build
-   ```
-
-2. **เปิดเบราว์เซอร์** ไปที่ **http://localhost:3000**
-3. **พิมพ์ชื่อผู้ป่วย** ในช่องกรอกข้อความ
-4. **คลิกปุ่ม "➕ เพิ่มคิว"** หรือกด Enter → คนไข้เข้าสถานะ **รอตรวจ** ทันที
-5. เมื่อถึงคิว กด **"เริ่มตรวจ ▶"** → คนไข้ย้ายไปสถานะ **กำลังตรวจ**
-6. ตรวจเสร็จแล้วกด **"✓ ตรวจเสร็จ"** → คนไข้ย้ายไปสถานะ **ตรวจเสร็จ**
-7. ✅ ข้อมูลทั้งหมดถูกบันทึกลง **MariaDB** แบบ Real-time — ต่อให้รีเฟรชหรือปิดเปิดหน้าเว็บ ข้อมูลยังอยู่ครบ
+> บัญชีเริ่มต้นถูกสร้างเฉพาะครั้งแรกที่ตาราง `users` ยังว่าง
+> ⚠️ **ทุกบัญชีต้องตั้งค่า 2FA (TOTP) ครั้งแรกก่อนเข้าใช้งาน** — หลังกดเข้าสู่ระบบ ระบบจะพาไปสแกน QR ด้วย
+> Google Authenticator และให้ **Backup Codes** ไว้กู้คืน (admin รีเซ็ต 2FA ให้ได้ที่เมนู 👥 จัดการผู้ใช้)
 
 ### 🛑 หยุดการทำงาน
 
 ```bash
-docker compose down        # หยุด container (ข้อมูลใน volume db_data ยังอยู่)
+docker compose down        # หยุด container (ข้อมูลใน volume ยังอยู่)
 docker compose down -v     # หยุด + ลบ volume ข้อมูลทั้งหมด
 ```
 
-### 🔍 ตรวจสอบ container / ดูข้อมูลในฐานข้อมูล
+---
+
+## 🔧 การตั้งค่า (Environment Variables)
+
+คัดลอก `.env.example` → `.env` แล้วแก้ค่าตามต้องการ:
 
 ```bash
-docker compose ps                                  # ดูสถานะ container ทั้ง 2
-docker compose exec db mariadb -u queue_user -pqueue_pass hospital_queue -e "SELECT id, name, status FROM patients ORDER BY seq;"
+cp .env.example .env
 ```
 
-### 💻 รันแบบไม่ใช้ Docker (สำหรับพัฒนา)
+| ตัวแปร | ค่าเริ่มต้น | ความหมาย |
+|--------|-----------|----------|
+| `APP_PORT` | `3000` | พอร์ตที่เข้าใช้งานเว็บ |
+| `MARIADB_*` | - | ฐานข้อมูล/user/password ของ MariaDB |
+| `JWT_SECRET` | dev | **ควรเปลี่ยน** เป็น string ยาว ๆ สุ่ม |
+| `COOKIE_SECURE` | `false` | ใส่ `true` เมื่อใช้ HTTPS |
+| `SEED_ADMIN_PASSWORD` | `admin123` | รหัสผ่าน admin (seed ครั้งแรก) |
+| `SEED_RECEPTIONIST_PASSWORD` | `reception123` | รหัสผ่าน receptionist (seed ครั้งแรก) |
+| `SEED_DOCTOR_PASSWORD` | `doctor123` | รหัสผ่าน doctor (seed ครั้งแรก) |
 
-ต้องมี MariaDB/MySQL เปิดอยู่แล้ว จากนั้นกำหนดค่า connection ผ่าน environment:
+---
+
+## 💻 รันแบบไม่ใช้ Docker (สำหรับพัฒนา)
+
+ต้องมี MariaDB/MySQL และ Node.js >= 18 อยู่แล้ว
+
+**Terminal 1 — Backend (Express + API) บนพอร์ต 3000:**
 
 ```bash
-DB_HOST=127.0.0.1 DB_USER=queue_user DB_PASSWORD=queue_pass DB_NAME=hospital_queue node server.js
+cd backend
+npm install
+DB_HOST=127.0.0.1 DB_USER=queue_user DB_PASSWORD=queue_pass DB_NAME=hospital_queue npm start
 ```
+
+**Terminal 2 — Frontend (Vite dev server บนพอร์ต 5173 พร้อม proxy /api):**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+เปิด http://localhost:5173
+
+**Build frontend แบบ production (แล้วให้ backend เสิร์ฟ):**
+
+```bash
+cd frontend
+npm run build      # สร้างไฟล์ที่ frontend/dist
+```
+
+---
+
+## 🏗️ โครงสร้างโปรเจกต์
+
+```
+📂 hospital-queue-system/
+├── 📂 backend/                 # 🚀 Express.js (REST API + JWT/RBAC)
+│   ├── 📂 src/
+│   │   ├── index.js            # ตั้งค่า Express + เสิร์ฟ static Vue (dist)
+│   │   ├── db.js               # ชั้นข้อมูล MariaDB + seed ผู้ใช้เริ่มต้น
+│   │   ├── 📂 middleware/
+│   │   │   └── auth.js         # JWT + requireAuth + allowRoles (RBAC)
+│   │   ├── 📂 routes/
+│   │   │   ├── auth.js         # POST /api/auth/login | GET /me | POST /logout
+│   │   │   ├── queue.js        # /api/queue/* (เพิ่ม/เลื่อน/ล้าง)
+│   │   │   └── users.js        # /api/users/* (admin เท่านั้น)
+│   │   └── 📂 utils/
+│   │       └── async-handler.js
+│   ├── package.json
+│   └── package-lock.json
+├── 📂 frontend/                # 🌸 Vue 3 + Vite
+│   ├── index.html
+│   ├── vite.config.js          # dev proxy /api → localhost:3000
+│   ├── package.json
+│   ├── package-lock.json
+│   └── 📂 src/
+│       ├── main.js / App.vue / style.css
+│       ├── api.js              # ตัวเรียก REST API
+│       ├── 📂 store/auth.js    # สถานะผู้ใช้ + login/logout
+│       ├── 📂 router/index.js  # guard ตามบทบาท
+│       ├── 📂 components/TopBar.vue
+│       └── 📂 views/
+│           ├── LoginView.vue       # หน้าเข้าสู่ระบบ
+│           ├── QueueBoardView.vue  # กระดานคิว (สิทธิ์ตามบทบาท)
+│           └── UsersView.vue       # จัดการผู้ใช้ (admin)
+├── 📄 Dockerfile               # 🐳 multi-stage: build Vue → runtime Express
+├── 📄 docker-compose.yml       # container db + frontend
+├── 📄 .env.example             # ตัวอย่าง environment variables
+├── 📄 README.md
+├── 📄 CLAUDE.md
+├── 📄 LICENSE
+└── 📄 .gitignore / .dockerignore
+```
+
+---
+
+## 🔌 API (ย่อ)
+
+| Method | Path | สิทธิ์ | คำอธิบาย |
+|--------|------|--------|----------|
+| POST | `/api/auth/login` | ทุกคน | login → ตั้ง httpOnly cookie |
+| GET | `/api/auth/me` | ทุกคนที่ login | ข้อมูลผู้ใช้ปัจจุบัน |
+| POST | `/api/auth/logout` | ทุกคนที่ login | logout |
+| GET | `/api/queue` | ทุกคนที่ login | อ่านคิวทั้ง 3 สถานะ |
+| POST | `/api/queue` | admin, receptionist | เพิ่มคิว |
+| POST | `/api/queue/move` | admin, doctor | เลื่อนสถานะ |
+| POST | `/api/queue/clear` | admin, receptionist | ล้างคิวที่รอตรวจ |
+| POST | `/api/queue/clear-all` | admin | ล้างทุกสถานะ |
+| GET | `/api/users` | admin | รายชื่อผู้ใช้ |
+| POST | `/api/users` | admin | สร้างผู้ใช้ |
+| PUT | `/api/users/:id` | admin | แก้ไขชื่อ/บทบาท/รหัสผ่าน |
+| DELETE | `/api/users/:id` | admin | ลบผู้ใช้ |
 
 ---
 
 ## 🧰 เทคโนโลยีที่ใช้
 
-- ![HTML5](https://img.shields.io/badge/-HTML5-E34F26?style=flat&logo=html5&logoColor=white)
-- ![CSS3](https://img.shields.io/badge/-CSS3-1572B6?style=flat&logo=css3&logoColor=white)
-- ![JavaScript](https://img.shields.io/badge/-JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
-- ![Node.js](https://img.shields.io/badge/-Node.js-339933?style=flat&logo=node.js&logoColor=white)
-- ![MariaDB](https://img.shields.io/badge/-MariaDB-003545?style=flat&logo=mariadb&logoColor=white)
-- ![Docker](https://img.shields.io/badge/-Docker-2496ED?style=flat&logo=docker&logoColor=white)
-
-> 💡 **Vanilla JS + Node.js ล้วน ๆ** — ฝั่งเว็บไม่พึ่งพา framework ใด ๆ ส่วนการเชื่อมต่อ MariaDB ใช้ package `mysql2`
-
----
-
-## 🏗️ สถาปัตยกรรม (Docker)
-
-```
-┌───────────────────────────  docker compose  ───────────────────────────┐
-│                                                                        │
-│   ┌────────────────────────────┐        ┌────────────────────────────┐ │
-│   │   container: frontend       │        │   container: db            │ │
-│   │   ─────────────────────     │        │   ─────────────────────     │ │
-│   │   Node.js (server.js)       │        │   MariaDB 11.4             │ │
-│   │   • เสิร์ฟ index.html        │        │   • ตาราง patients         │ │
-│   │   • REST API /api/queue/*   │ ─────▶ │   • ตาราง queue_seq        │ │
-│   │                            │  :3306  │   volume: db_data          │ │
-│   └────────────────────────────┘        └────────────────────────────┘ │
-│   http://localhost:3000                     (ข้อมูลอยู่รอดทุก rebuild)   │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📁 โครงสร้างไฟล์
-
-```
-📂 hospital-queue-system/
-├── 📄 index.html            # 🌸 หน้าเว็บหลัก (กระดานคิว + สถานะการตรวจ)
-├── 📄 server.js             # 🚀 เว็บเซิร์ฟเวอร์ + API (อยู่ใน container frontend)
-├── 📄 db.js                 # 🗄️ ชั้นเชื่อมต่อ/คิวรีกับ MariaDB (แทนการเขียนไฟล์ .txt)
-├── 📄 package.json          # 📦 รายการ dependency (mysql2)
-├── 📄 Dockerfile            # 🐳 สร้าง image ของ container frontend
-├── 📄 docker-compose.yml    # 🐳 ประกาศ container db + frontend (แยกกัน)
-├── 📄 .dockerignore         # 🙈 ไฟล์ที่ไม่ต้องคัดลอกเข้า image
-├── 📄 README.md             # 📖 ไฟล์คำอธิบายโปรเจกต์
-├── 📄 CLAUDE.md             # 🤖 บันทึกความต้องการจาก Claude
-├── 📄 LICENSE               # 📜 สัญญาอนุญาต (MIT)
-├── 📄 .gitattributes        # ⚙️ กำหนดค่า Git attributes
-└── 📄 .gitignore            # 🙈 ไฟล์ที่ Git ไม่ต้องติดตาม
-```
+- Vue 3 + Vue Router + Vite
+- Node.js + Express.js
+- MariaDB (mysql2) + JWT (jsonwebtoken) + bcryptjs
+- Docker / Docker Compose
 
 ---
 
@@ -146,4 +201,5 @@ DB_HOST=127.0.0.1 DB_USER=queue_user DB_PASSWORD=queue_pass DB_NAME=hospital_que
 
 ---
 
-> 🌷 **Made with 💖, lots of pink colors, Docker 🐳 and MariaDB 🗄️!**
+> 🌷 **Made with 💖, lots of pink colors, Vue 💚, Express 🚀 and MariaDB 🗄️!**
+

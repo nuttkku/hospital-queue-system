@@ -1,6 +1,6 @@
 # 🌸 Hospital Queue System — รันด้วย 2 container แยกกัน
 #   db        : MariaDB (เก็บข้อมูล)
-#   frontend  : Node.js เสิร์ฟหน้าเว็บ + REST API
+#   frontend  : Express.js + Vue 3 (build แล้ว) — REST API + หน้าเว็บ
 #
 # เริ่มต้น:  docker compose up -d --build
 # หยุด:      docker compose down          (ข้อมูลใน volume ยังอยู่)
@@ -15,7 +15,6 @@ services:
       MARIADB_DATABASE: ${MARIADB_DATABASE:-hospital_queue}
       MARIADB_USER: ${MARIADB_USER:-queue_user}
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-queue_pass}
-    # ข้อมูลจริงอยู่ใน Docker volume (ไม่อยู่ใน container -> อยู่รอดแม้ rebuild)
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -26,7 +25,7 @@ services:
       start_period: 10s
     networks:
       - queue-net
-    # หากต้องการเข้าถึง MariaDB จากภายนอก (เช่น ใช้ GUI ดูข้อมูล) ให้แกะคอมเมนต์:
+    # แกะคอมเมนต์ถ้าต้องการเข้า MariaDB จากเครื่อง host (เช่น ใช้ GUI):
     # ports:
     #   - "3306:3306"
 
@@ -45,6 +44,19 @@ services:
       DB_USER: ${MARIADB_USER:-queue_user}
       DB_PASSWORD: ${MARIADB_PASSWORD:-queue_pass}
       DB_NAME: ${MARIADB_DATABASE:-hospital_queue}
+      # 🔐 ควรเปลี่ยน JWT_SECRET เมื่อนำไปใช้งานจริง (ดู .env.example)
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # 🔑 2FA (TOTP) — ใช้เข้ารหัส TOTP secret ใน DB (ควรเปลี่ยนเป็นค่าสุ่มยาว ๆ)
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-dev-2fa-encryption-key-change-me}
+      TWOFA_ISSUER: ${TWOFA_ISSUER:-HospitalQueue}
+      # บัญชีเริ่มต้น (seed ครั้งแรกเท่านั้น ถ้ายังไม่มีผู้ใช้ในระบบ)
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+      SEED_RECEPTIONIST_USERNAME: ${SEED_RECEPTIONIST_USERNAME:-receptionist}
+      SEED_RECEPTIONIST_PASSWORD: ${SEED_RECEPTIONIST_PASSWORD:-reception123}
+      SEED_DOCTOR_USERNAME: ${SEED_DOCTOR_USERNAME:-doctor}
+      SEED_DOCTOR_PASSWORD: ${SEED_DOCTOR_PASSWORD:-doctor123}
     ports:
       - "${APP_PORT:-3000}:3000"
     networks:

@@ -3,26 +3,27 @@
 .gitattributes
 .gitignore
 
-# เอกสารที่ไม่ต้องลง image
-README.md
-CLAUDE.md
-LICENSE
-
-# Node
-node_modules
+# Node — ไม่ต้องคัดลอก node_modules เข้า build context
+**/node_modules
 npm-debug.log*
 *.log
 
-# ข้อมูล runtime เก่ารูปแบบไฟล์ (ถูกแทนที่ด้วย MariaDB แล้ว)
-queue.txt
-checking.txt
-done.txt
-
-# Environment
-.env
-.env.*
+# ผล build frontend — จะ build ใหม่ใน Dockerfile เอง
+frontend/dist
 
 # Docker
 docker-compose.yml
 Dockerfile
 .dockerignore
+
+# Environment (จะใช้ --env-file ถ้าต้องการ)
+.env
+.env.*
+
+# เอกสาร
+README.md
+CLAUDE.md
+LICENSE
+
+# ข้อมูล runtime เก่ารูปแบบไฟล์ (ถูกแทนที่ด้วย MariaDB แล้ว)
+*.txt
