@@ -7,6 +7,7 @@ import QueueBoardView from "../views/QueueBoardView.vue";
 import UsersView from "../views/UsersView.vue";
 import ServerStats from "../views/ServerStats.vue";
 import SettingsView from "../views/SettingsView.vue";
+import ActivityLog from "../views/ActivityLog.vue";
 
 const router = createRouter({
     history: createWebHistory(),
@@ -18,6 +19,7 @@ const router = createRouter({
         { path: "/users", name: "users", component: UsersView, meta: { roles: ["admin"] } },
         { path: "/system", name: "system", component: ServerStats, meta: { roles: ["admin"] } },
         { path: "/settings", name: "settings", component: SettingsView, meta: { roles: ["admin"] } },
+        { path: "/logs", name: "logs", component: ActivityLog, meta: { roles: ["admin"] } },
         { path: "/:pathMatch(.*)*", redirect: "/" },
     ],
 });

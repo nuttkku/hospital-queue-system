@@ -51,6 +51,7 @@ router.post("/login", asyncHandler(async (req, res) => {
     const stage = user.totp_enabled ? "verify" : "setup";
     clearAuthCookies(res); // เคลียร์ session/pre-auth เก่า (ถ้ามี)
     setPreAuthCookie(res, user.id, stage);
+    await db.logActivity({ userId: user.id, username: user.username, action: "เข้าสู่ระบบ (ผ่านรหัสผ่าน)", detail: `รอขั้นตอน 2FA: ${stage}`, ip: req.ip });
 
     if (stage === "setup") {
         return res.json({ stage: "setup_required", user: db.toSafeUser(user) });

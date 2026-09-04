@@ -1,5 +1,6 @@
 // ⚙️ Routes: Settings (admin) — ตั้งค่า Social Login
 const express = require("express");
+const db = require("../db");
 const { requireAuth, allowRoles } = require("../middleware/auth");
 const asyncHandler = require("../utils/async-handler");
 const social = require("../services/social.service");
@@ -25,6 +26,7 @@ router.put("/social", adminOnly, asyncHandler(async (req, res) => {
     await social.saveConfig(provider, { enabled, clientId, secret });
     const view = await social.getAdminView(provider);
     console.log(`⚙️ ${req.user.username} อัปเดต Social Login: ${provider} enabled=${view.enabled} configured=${view.configured}`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "ตั้งค่า Social Login", detail: `${provider} enabled=${view.enabled}`, ip: req.ip });
     return res.json({ provider: view });
 }));
 

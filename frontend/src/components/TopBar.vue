@@ -11,6 +11,7 @@
                 <router-link v-if="auth.user.role === 'admin'" to="/system" class="nav-link">🖥️ เซิร์ฟเวอร์</router-link>
                 <router-link v-if="auth.user.role === 'admin'" to="/settings" class="nav-link">🔗 Social Login</router-link>
                 <router-link v-if="auth.user.role === 'admin'" to="/users" class="nav-link">👥 จัดการผู้ใช้</router-link>
+                <router-link v-if="auth.user.role === 'admin'" to="/logs" class="nav-link">📜 Activity Log</router-link>
             </nav>
 
             <div v-if="auth.user" class="userbox">

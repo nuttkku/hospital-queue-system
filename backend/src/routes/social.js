@@ -72,6 +72,13 @@ router.get("/social/callback/:provider", asyncHandler(async (req, res) => {
             });
             console.log(`🌐 สร้างผู้ใช้จาก ${provider}: ${user.username}`);
         }
+        await db.logActivity({
+            userId: user.id,
+            username: user.username,
+            action: `เข้าสู่ระบบผ่าน Social (${provider})`,
+            detail: profile.name || "",
+            ip: req.ip,
+        });
 
         social.clearStateCookie(res);
         // เข้า flow 2FA เหมือน login ปกติ (ทุกบัญชีต้องผ่าน 2FA)

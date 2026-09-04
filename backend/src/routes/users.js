@@ -36,6 +36,7 @@ router.post("/", adminOnly, asyncHandler(async (req, res) => {
     try {
         const user = await db.createUser({ username, name, password, role });
         console.log(`👤 ${req.user.username} สร้างผู้ใช้: ${username} (${role})`);
+        await db.logActivity({ userId: req.user.id, username: req.user.username, action: "เพิ่มผู้ใช้", detail: `${username} (${role})`, ip: req.ip });
         return res.json({ user });
     } catch (err) {
         if (err && err.code === "ER_DUP_ENTRY") {
@@ -81,6 +82,8 @@ router.put("/:id", adminOnly, asyncHandler(async (req, res) => {
     }
 
     const user = await db.updateUser(id, patch);
+    const changed = Object.keys(patch).map((k) => k).join(", ");
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "แก้ไขผู้ใช้", detail: `${target.username} (${changed})`, ip: req.ip });
     return res.json({ user });
 }));
 
@@ -102,6 +105,7 @@ router.delete("/:id", adminOnly, asyncHandler(async (req, res) => {
     }
     await db.deleteUser(id);
     console.log(`🗑️ ${req.user.username} ลบผู้ใช้: ${target.username}`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "ลบผู้ใช้", detail: target.username, ip: req.ip });
     return res.json({ ok: true });
 }));
 
@@ -117,6 +121,7 @@ router.post("/:id/reset-2fa", adminOnly, asyncHandler(async (req, res) => {
     }
     await db.resetTwoFa(id);
     console.log(`🔐 ${req.user.username} รีเซ็ต 2FA ของผู้ใช้: ${target.username}`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "รีเซ็ต 2FA", detail: target.username, ip: req.ip });
     return res.json({ ok: true });
 }));
 

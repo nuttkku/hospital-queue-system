@@ -74,6 +74,18 @@ const SCHEMA_STATEMENTS = [
         KEY idx_social_accounts_user (user_id),
         CONSTRAINT fk_social_accounts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS activity_logs (
+        id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id    INT UNSIGNED    NULL,
+        username   VARCHAR(50)     NULL,
+        action     VARCHAR(100)    NOT NULL,
+        detail     VARCHAR(500)    NULL,
+        ip_address VARCHAR(64)     NULL,
+        created_at TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_activity_created (created_at),
+        KEY idx_activity_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 // เติมคอลัมน์ 2FA ให้ตาราง users ที่สร้างไว้ก่อนหน้านี้ (กรณีอัปเกรดจากเวอร์ชันเก่า)
@@ -435,6 +447,30 @@ async function linkSocialAccount(userId, provider, providerUserId) {
     );
 }
 
+// ---------- Activity log (บันทึกการกระทำของผู้ใช้) ----------
+async function logActivity({ userId = null, username = null, action = "unknown", detail = "", ip = null } = {}) {
+    await getPool().execute(
+        "INSERT INTO activity_logs (user_id, username, action, detail, ip_address) VALUES (?, ?, ?, ?, ?)",
+        [userId, username || null, String(action).slice(0, 100), String(detail || "").slice(0, 500), ip || null]
+    );
+}
+
+// อ่าน activity log แบบแบ่งหน้า (ใหม่สุดก่อน)
+async function listActivityLogs({ page = 1, perPage = 10 } = {}) {
+    const p = Math.max(1, Number(page) || 1);
+    const n = Math.min(100, Math.max(1, Number(perPage) || 10));
+    const offset = (p - 1) * n;
+
+    const [rows] = await getPool().query(
+        `SELECT id, username, action, detail, ip_address, created_at
+         FROM activity_logs ORDER BY id DESC LIMIT ? OFFSET ?`,
+        [n, offset]
+    );
+    const [countRows] = await getPool().query("SELECT COUNT(*) AS c FROM activity_logs");
+    const total = Number(countRows[0].c);
+    return { rows, total, page: p, perPage: n, totalPages: Math.max(1, Math.ceil(total / n)) };
+}
+
 async function close() {
     if (pool) {
         await pool.end();
@@ -479,6 +515,9 @@ module.exports = {
     findUserBySocial,
     createSocialUser,
     linkSocialAccount,
+    // Activity log
+    logActivity,
+    listActivityLogs,
     // ปิดระบบ
     close,
 };

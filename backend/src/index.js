@@ -24,6 +24,7 @@ app.use("/api/users", require("./routes/users"));
 app.use("/api/chat", require("./routes/chat"));
 app.use("/api/system", require("./routes/system"));
 app.use("/api/settings", require("./routes/settings"));
+app.use("/api", require("./routes/activity"));
 
 // ---------- เสิร์ฟ static frontend (เฉพาะกรณีรันแบบไม่แยก container มี dist อยู่) ----------
 // โหมดแยก container: งานนี้เป็นของ container frontend (nginx) — backend ตอบ API อย่างเดียว

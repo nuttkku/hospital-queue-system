@@ -23,6 +23,7 @@ router.post("/", requireAuth, allowRoles("admin", "receptionist"), asyncHandler(
     }
     await db.addPatient(clean);
     console.log(`➕ ${req.user.username} เพิ่มคิว (รอตรวจ): ${clean}`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "เพิ่มคิว", detail: clean, ip: req.ip });
     return res.json({ ok: true, ...(await db.getQueue()) });
 }));
 
@@ -31,6 +32,7 @@ router.post("/move", requireAuth, allowRoles("admin", "doctor"), asyncHandler(as
     const { from, index } = (req.body && req.body) || {};
     const moved = await db.movePatient(from, index);
     console.log(`🚶 ${req.user.username} ย้าย ${moved} (${from} -> ${db.nextStatus(from)})`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: `เลื่อนสถานะ ${from} -> ${db.nextStatus(from)}`, detail: moved, ip: req.ip });
     return res.json({ ok: true, ...(await db.getQueue()) });
 }));
 
@@ -38,6 +40,7 @@ router.post("/move", requireAuth, allowRoles("admin", "doctor"), asyncHandler(as
 router.post("/clear", requireAuth, allowRoles("admin", "receptionist"), asyncHandler(async (req, res) => {
     await db.clearWaiting();
     console.log(`🗑️ ${req.user.username} ล้างคิวที่รอตรวจแล้ว`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "ล้างคิวที่รอตรวจ", detail: "ลบผู้ป่วยในสถานะรอตรวจทั้งหมด", ip: req.ip });
     return res.json({ ok: true, ...(await db.getQueue()) });
 }));
 
@@ -45,6 +48,7 @@ router.post("/clear", requireAuth, allowRoles("admin", "receptionist"), asyncHan
 router.post("/clear-all", requireAuth, allowRoles("admin"), asyncHandler(async (req, res) => {
     await db.clearAll();
     console.log(`🧹 ${req.user.username} ล้างข้อมูลทุกสถานะแล้ว`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "ล้างข้อมูลทั้งหมด", detail: "ลบผู้ป่วยทุกสถานะ (รอตรวจ/กำลังตรวจ/ตรวจเสร็จ)", ip: req.ip });
     return res.json({ ok: true, ...(await db.getQueue()) });
 }));
 

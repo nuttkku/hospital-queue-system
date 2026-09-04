@@ -167,7 +167,57 @@ router.post("/security/ai-scan", adminOnly, asyncHandler(async (req, res) => {
     const record = { scannedAt: new Date().toISOString(), model, reply };
     await db.setSetting("security:ai", JSON.stringify(record));
     console.log(`🤖 ${req.user.username} เรียก AI security scan สำเร็จ`);
+    await db.logActivity({ userId: req.user.id, username: req.user.username, action: "สแกนความปลอดภัยด้วย AI", detail: "DeepSeek security scan", ip: req.ip });
     return res.json(record);
+}));
+
+const NGINX_LOG = process.env.NGINX_ACCESS_LOG || "/app/logs/web-access.log";
+const ACCESS_LINE_RE = /^(\S+)\s+\S+\s+\S+\s+\[([^\]]+)\]\s+"([^"]*)"\s+(\d{3})\s+(\S+)\s+"([^"]*)"\s+"([^"]*)"/;
+
+function parseNginxLine(line) {
+    const m = line.match(ACCESS_LINE_RE);
+    if (!m) return null;
+    const [method, path, protocol] = m[3].split(" ");
+    return {
+        ip: m[1],
+        time: m[2],
+        method: method || "",
+        path: path || "",
+        protocol: protocol || "",
+        status: Number(m[4]),
+        bytes: m[5] === "-" ? 0 : Number(m[5]) || 0,
+        referer: m[6] === "-" ? "" : m[6],
+        userAgent: m[7] === "-" ? "" : m[7],
+    };
+}
+
+// GET /api/system/access-log — Access log ของ nginx (proxy) แบ่งหน้าละ 10 แถว
+router.get("/access-log", adminOnly, asyncHandler(async (req, res) => {
+    let lines = [];
+    try {
+        const content = fs.readFileSync(NGINX_LOG, "utf8");
+        lines = content.split(/\r?\n/).filter(Boolean).slice(-3000);
+    } catch {
+        lines = []; // ยังไม่มีไฟล์ log (เช่นยังไม่มี request)
+    }
+
+    const parsed = [];
+    for (const line of lines) {
+        const row = parseNginxLine(line);
+        if (row) parsed.push(row);
+    }
+    parsed.reverse(); // แสดงใหม่สุดก่อน
+
+    const perPage = Math.min(100, Math.max(1, Number(req.query.perPage) || 10));
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const start = (page - 1) * perPage;
+    return res.json({
+        rows: parsed.slice(start, start + perPage),
+        total: parsed.length,
+        page,
+        perPage,
+        totalPages: Math.max(1, Math.ceil(parsed.length / perPage)),
+    });
 }));
 
 module.exports = router;
