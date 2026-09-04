@@ -5,6 +5,8 @@ import Setup2FAView from "../views/Setup2FA.vue";
 import Verify2FAView from "../views/Verify2FA.vue";
 import QueueBoardView from "../views/QueueBoardView.vue";
 import UsersView from "../views/UsersView.vue";
+import ServerStats from "../views/ServerStats.vue";
+import SettingsView from "../views/SettingsView.vue";
 
 const router = createRouter({
     history: createWebHistory(),
@@ -14,6 +16,8 @@ const router = createRouter({
         { path: "/2fa/verify", name: "2fa-verify", component: Verify2FAView, meta: { public: true } },
         { path: "/", name: "board", component: QueueBoardView },
         { path: "/users", name: "users", component: UsersView, meta: { roles: ["admin"] } },
+        { path: "/system", name: "system", component: ServerStats, meta: { roles: ["admin"] } },
+        { path: "/settings", name: "settings", component: SettingsView, meta: { roles: ["admin"] } },
         { path: "/:pathMatch(.*)*", redirect: "/" },
     ],
 });

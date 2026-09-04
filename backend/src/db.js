@@ -58,6 +58,22 @@ const SCHEMA_STATEMENTS = [
         KEY idx_backup_codes_user (user_id),
         CONSTRAINT fk_backup_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS app_settings (
+        name  VARCHAR(100) NOT NULL,
+        value TEXT          NULL,
+        PRIMARY KEY (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS social_accounts (
+        id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id          INT UNSIGNED NOT NULL,
+        provider         ENUM('facebook','google','line') NOT NULL,
+        provider_user_id VARCHAR(255) NOT NULL,
+        created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_social_provider_puid (provider, provider_user_id),
+        KEY idx_social_accounts_user (user_id),
+        CONSTRAINT fk_social_accounts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 // เติมคอลัมน์ 2FA ให้ตาราง users ที่สร้างไว้ก่อนหน้านี้ (กรณีอัปเกรดจากเวอร์ชันเก่า)
@@ -359,6 +375,66 @@ async function markBackupCodeUsed(id) {
     await getPool().execute("UPDATE backup_codes SET used_at = NOW() WHERE id = ?", [id]);
 }
 
+// ---------- App settings (key-value) ----------
+async function getSetting(name) {
+    const [rows] = await getPool().execute("SELECT value FROM app_settings WHERE name = ?", [name]);
+    return rows[0] ? rows[0].value : null;
+}
+
+async function setSetting(name, value) {
+    await getPool().execute(
+        "INSERT INTO app_settings (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
+        [name, value]
+    );
+}
+
+// ---------- Social login (บัญชีที่เชื่อมกับ provider ภายนอก) ----------
+// หา user จาก provider_user_id (ผ่านตาราง social_accounts)
+async function findUserBySocial(provider, providerUserId) {
+    const [rows] = await getPool().execute(
+        `SELECT u.id, u.username, u.name, u.role, u.totp_enabled
+         FROM social_accounts s JOIN users u ON u.id = s.user_id
+         WHERE s.provider = ? AND s.provider_user_id = ?
+         LIMIT 1`,
+        [provider, providerUserId]
+    );
+    return rows[0] ? toSafeUser(rows[0]) : null;
+}
+
+// สร้าง user ใหม่ (username อัตโนมัติ) + ผูก social_account ใน transaction
+async function createSocialUser({ provider, providerUserId, name }) {
+    const username = `${provider}_${String(providerUserId).slice(0, 30)}`;
+    const randomPassword = bcrypt.hashSync(require("crypto").randomUUID(), 10);
+    const conn = await getPool().getConnection();
+    try {
+        await conn.beginTransaction();
+        const [result] = await conn.execute(
+            "INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, 'receptionist')",
+            [username, randomPassword, String(name || "").slice(0, 100) || username]
+        );
+        const userId = result.insertId;
+        await conn.execute(
+            "INSERT INTO social_accounts (user_id, provider, provider_user_id) VALUES (?, ?, ?)",
+            [userId, provider, String(providerUserId)]
+        );
+        await conn.commit();
+        return findUserById(userId);
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+// ผูก social_account เข้ากับ user ที่ login อยู่แล้ว (กรณีมี user แต่ยังไม่ได้ link)
+async function linkSocialAccount(userId, provider, providerUserId) {
+    await getPool().execute(
+        "INSERT INTO social_accounts (user_id, provider, provider_user_id) VALUES (?, ?, ?)",
+        [userId, provider, String(providerUserId)]
+    );
+}
+
 async function close() {
     if (pool) {
         await pool.end();
@@ -396,6 +472,13 @@ module.exports = {
     insertBackupCodes,
     getUnusedBackupCodes,
     markBackupCodeUsed,
+    // Settings (key-value)
+    getSetting,
+    setSetting,
+    // Social login
+    findUserBySocial,
+    createSocialUser,
+    linkSocialAccount,
     // ปิดระบบ
     close,
 };

@@ -1,0 +1,5 @@
+# Proxy .dockerignore
+ssl
+*.log
+Dockerfile
+.dockerignore

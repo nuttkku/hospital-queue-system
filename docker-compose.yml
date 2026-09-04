@@ -1,11 +1,32 @@
-# 🌸 Hospital Queue System — รันด้วย 2 container แยกกัน
-#   db        : MariaDB (เก็บข้อมูล)
-#   frontend  : Express.js + Vue 3 (build แล้ว) — REST API + หน้าเว็บ
+# 🌸 Hospital Queue System — 4 containers แยกกัน
+#   proxy     : nginx Reverse Proxy + HTTPS (self-signed)   — ทางเข้าเดียว https://localhost
+#   db        : MariaDB (เก็บข้อมูล)                        — เปิดพอร์ต 3306 สำหรับ SQL client
+#   backend   : Express.js REST API                         — อยู่หลัง proxy (ไม่เปิดพอร์ต host)
+#   frontend  : nginx เสิร์ฟ Vue (build แล้ว)               — อยู่หลัง proxy (ไม่เปิดพอร์ต host)
 #
 # เริ่มต้น:  docker compose up -d --build
+# เข้าใช้:   https://localhost        (มีคำเตือน cert — กด Advanced แล้ว proceed ได้)
 # หยุด:      docker compose down          (ข้อมูลใน volume ยังอยู่)
 # ลบข้อมูล:  docker compose down -v
+#
+# 🔌 SQL Client (DBeaver / HeidiSQL / MySQL CLI):
+#   Host: 127.0.0.1  Port: 3306  User: queue_user  Password: queue_pass  Database: hospital_queue
 services:
+  proxy:
+    build:
+      context: ./proxy
+    image: hospital-queue-proxy:latest
+    container_name: hospital-queue-proxy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "${HTTPS_PORT:-443}:443"     # https://localhost
+      - "${HTTP_PORT:-80}:80"        # http://localhost -> redirect ไป https
+    networks:
+      - queue-net
+
   db:
     image: mariadb:11.4
     container_name: hospital-queue-db
@@ -15,6 +36,9 @@ services:
       MARIADB_DATABASE: ${MARIADB_DATABASE:-hospital_queue}
       MARIADB_USER: ${MARIADB_USER:-queue_user}
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-queue_pass}
+    # 🔓 เปิดพอร์ตให้ SQL client จากเครื่อง host เข้าได้ (default 3306)
+    ports:
+      - "${MARIADB_PORT:-3306}:3306"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -25,14 +49,12 @@ services:
       start_period: 10s
     networks:
       - queue-net
-    # แกะคอมเมนต์ถ้าต้องการเข้า MariaDB จากเครื่อง host (เช่น ใช้ GUI):
-    # ports:
-    #   - "3306:3306"
 
-  frontend:
-    build: .
-    image: hospital-queue-frontend:latest
-    container_name: hospital-queue-frontend
+  backend:
+    build:
+      context: ./backend
+    image: hospital-queue-backend:latest
+    container_name: hospital-queue-backend
     restart: unless-stopped
     depends_on:
       db:
@@ -46,10 +68,16 @@ services:
       DB_NAME: ${MARIADB_DATABASE:-hospital_queue}
       # 🔐 ควรเปลี่ยน JWT_SECRET เมื่อนำไปใช้งานจริง (ดู .env.example)
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # เว็บเป็น HTTPS แล้ว → cookie ควรเป็น Secure
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       # 🔑 2FA (TOTP) — ใช้เข้ารหัส TOTP secret ใน DB (ควรเปลี่ยนเป็นค่าสุ่มยาว ๆ)
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-dev-2fa-encryption-key-change-me}
       TWOFA_ISSUER: ${TWOFA_ISSUER:-HospitalQueue}
+      # 🤖 AI Chatbot (DeepSeek) — ใส่ key ในไฟล์ .env (อย่า commit ขึ้น git)
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      # 🌐 Social Login — URL ฐานของเว็บ (ใช้สร้าง callback URL ให้ Facebook/Google/LINE)
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://localhost}
       # บัญชีเริ่มต้น (seed ครั้งแรกเท่านั้น ถ้ายังไม่มีผู้ใช้ในระบบ)
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
@@ -57,8 +85,20 @@ services:
       SEED_RECEPTIONIST_PASSWORD: ${SEED_RECEPTIONIST_PASSWORD:-reception123}
       SEED_DOCTOR_USERNAME: ${SEED_DOCTOR_USERNAME:-doctor}
       SEED_DOCTOR_PASSWORD: ${SEED_DOCTOR_PASSWORD:-doctor123}
-    ports:
-      - "${APP_PORT:-3000}:3000"
+    networks:
+      - queue-net
+    # ถ้าอยาก debug API ตรง ๆ (ไม่ผ่าน proxy) ให้แกะคอมเมนต์:
+    # ports:
+    #   - "${BACKEND_PORT:-3001}:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+    image: hospital-queue-frontend:latest
+    container_name: hospital-queue-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
     networks:
       - queue-net
 

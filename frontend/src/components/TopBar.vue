@@ -8,6 +8,8 @@
 
             <nav v-if="auth.user" class="nav">
                 <router-link to="/" class="nav-link">📋 กระดานคิว</router-link>
+                <router-link v-if="auth.user.role === 'admin'" to="/system" class="nav-link">🖥️ เซิร์ฟเวอร์</router-link>
+                <router-link v-if="auth.user.role === 'admin'" to="/settings" class="nav-link">🔗 Social Login</router-link>
                 <router-link v-if="auth.user.role === 'admin'" to="/users" class="nav-link">👥 จัดการผู้ใช้</router-link>
             </nav>
 

@@ -15,7 +15,7 @@
 | 👥 **จัดการผู้ใช้** | admin สร้าง/แก้ไข/ลบผู้ใช้ เปลี่ยนบทบาท และรีเซ็ตรหัสผ่านได้ |
 | 📋 **กระดาน 3 คอลัมน์** | แสดงคิวแยกสถานะ Real-time (refresh อัตโนมัติทุก 5 วินาที) พร้อมตัวนับ |
 | 🗄️ **MariaDB** | เก็บข้อมูลใน container `db` (volume `db_data` อยู่รอดทุก rebuild) |
-| 🐳 **Docker** | แยก 2 container: `db` (MariaDB) + `frontend` (Express + Vue) |
+| 🐳 **Docker** | แยก 4 container: `proxy` (nginx HTTPS) + `db` (MariaDB) + `backend` (Express API) + `frontend` (nginx + Vue) |
 | 🎨 **โทนสีชมพู** | UI สวยงามด้วยเฉดสีชมพูพาสเทล |
 | 🛡️ **ปลอดภัย** | รหัสผ่านเข้ารหัส bcrypt, กัน SQL Injection ด้วย parameter, Vue escape ป้องกัน XSS |
 
@@ -44,13 +44,17 @@
 docker compose up -d --build
 ```
 
-เปิด **http://localhost:3000** แล้วเข้าสู่ระบบด้วยบัญชีเริ่มต้น:
+เปิด **https://localhost** แล้วเข้าสู่ระบบด้วยบัญชีเริ่มต้น:
 
 | บทบาท | ชื่อผู้ใช้ | รหัสผ่าน |
 |--------|-----------|----------|
 | 👑 ผู้ดูแลระบบ | `admin` | `admin123` |
 | 🖥️ เจ้าหน้าที่รับคิว | `receptionist` | `reception123` |
 | 🩺 แพทย์ | `doctor` | `doctor123` |
+
+> 🔒 **Self-signed certificate** — เบราว์เซอร์จะเตือนว่าไม่ปลอดภัย (เพราะ cert ยังไม่ได้ออกโดย CA)
+> ให้กด **Advanced / ขั้นสูง → Proceed to localhost (ไม่ปลอดภัย)** แล้วเข้าใช้งานได้
+> (ข้อความเตือนนี้จะหายไปถ้านำ cert ของจริงมาใส่แทนที่ `/etc/nginx/ssl/` ใน container `proxy`)
 
 > บัญชีเริ่มต้นถูกสร้างเฉพาะครั้งแรกที่ตาราง `users` ยังว่าง
 > ⚠️ **ทุกบัญชีต้องตั้งค่า 2FA (TOTP) ครั้งแรกก่อนเข้าใช้งาน** — หลังกดเข้าสู่ระบบ ระบบจะพาไปสแกน QR ด้วย
@@ -75,13 +79,63 @@ cp .env.example .env
 
 | ตัวแปร | ค่าเริ่มต้น | ความหมาย |
 |--------|-----------|----------|
-| `APP_PORT` | `3000` | พอร์ตที่เข้าใช้งานเว็บ |
+| `HTTPS_PORT` | `443` | พอร์ต HTTPS (nginx proxy) — https://localhost |
+| `HTTP_PORT` | `80` | พอร์ต HTTP → redirect ไป HTTPS |
+| `MARIADB_PORT` | `3306` | พอร์ต MariaDB ที่เปิดให้ SQL client จาก host |
+| `BACKEND_PORT` | (ปิด) | ถ้าอยากเปิด API ตรง ๆ (ดู docker-compose.yml) |
 | `MARIADB_*` | - | ฐานข้อมูล/user/password ของ MariaDB |
 | `JWT_SECRET` | dev | **ควรเปลี่ยน** เป็น string ยาว ๆ สุ่ม |
-| `COOKIE_SECURE` | `false` | ใส่ `true` เมื่อใช้ HTTPS |
+| `COOKIE_SECURE` | `true` | cookie Secure (เว็บเป็น HTTPS แล้ว) |
 | `SEED_ADMIN_PASSWORD` | `admin123` | รหัสผ่าน admin (seed ครั้งแรก) |
 | `SEED_RECEPTIONIST_PASSWORD` | `reception123` | รหัสผ่าน receptionist (seed ครั้งแรก) |
 | `SEED_DOCTOR_PASSWORD` | `doctor123` | รหัสผ่าน doctor (seed ครั้งแรก) |
+
+---
+
+## 🔌 เชื่อมต่อฐานข้อมูลด้วย SQL Client (DBeaver / HeidiSQL / MySQL CLI)
+
+เปิดพอร์ต `3306` ออก host ไว้แล้ว — ตั้งค่าการเชื่อมต่อได้ดังนี้:
+
+| ค่า | รายละเอียด |
+|---|---|
+| **Host** | `127.0.0.1` (localhost) |
+| **Port** | `3306` (เปลี่ยนได้ด้วย `MARIADB_PORT`) |
+| **User** | `queue_user` |
+| **Password** | `queue_pass` |
+| **Database** | `hospital_queue` |
+
+ตัวอย่างผ่าน CLI:
+
+```bash
+mysql -h 127.0.0.1 -P 3306 -u queue_user -pqueue_pass hospital_queue
+```
+
+ตารางหลัก: `users` (ผู้ใช้ + สถานะ 2FA), `patients` (คิว), `queue_seq`, `backup_codes`
+> 💡 root password: `queue_root_pass` — ทั้งหมดเปลี่ยนได้ผ่าน `.env` (`MARIADB_*`)
+
+---
+
+## 📦 ข้อมูลอยู่ที่ไหน & ทำให้อยู่ถาวร
+
+ข้อมูลทั้งหมด (ผู้ใช้ คิว การตั้งค่า Social Login ฯลฯ) ถูกเก็บใน **Docker volume `db_data`** ที่ `/var/lib/mysql`
+ใน container `db` — **อยู่รอด** การ `docker compose down`, `docker compose restart` และแม้แต่ `docker compose up -d --build` (rebuild image)
+
+```bash
+docker volume ls                     # จะเห็น volume ของโปรเจกต์
+docker volume inspect hospital-queue-system_db_data   # ดูตำแหน่งจริงบนเครื่อง
+```
+
+> ⚠️ ข้อมูลจะ **หายก็ต่อเมื่อ** รัน `docker compose down -v` หรือลบ volume ทิ้งเองเท่านั้น
+
+**สำรอง/กู้คืนข้อมูล (แนะนำก่อนทำอะไรใหญ่ ๆ):**
+
+```bash
+# Backup ทั้ง DB ออกเป็นไฟล์
+docker compose exec db sh -c "mariadb-dump -u queue_user -pqueue_pass hospital_queue" > backup.sql
+
+# Restore
+Get-Content backup.sql | docker compose exec -T db mariadb -u queue_user -pqueue_pass hospital_queue
+```
 
 ---
 
@@ -120,21 +174,27 @@ npm run build      # สร้างไฟล์ที่ frontend/dist
 
 ```
 📂 hospital-queue-system/
-├── 📂 backend/                 # 🚀 Express.js (REST API + JWT/RBAC)
+├── 📂 backend/                 # 🚀 Express.js (REST API + JWT/RBAC + 2FA) — container: backend
 │   ├── 📂 src/
-│   │   ├── index.js            # ตั้งค่า Express + เสิร์ฟ static Vue (dist)
+│   │   ├── index.js            # ตั้งค่า Express + ต่อ route (API อย่างเดียว)
 │   │   ├── db.js               # ชั้นข้อมูล MariaDB + seed ผู้ใช้เริ่มต้น
 │   │   ├── 📂 middleware/
-│   │   │   └── auth.js         # JWT + requireAuth + allowRoles (RBAC)
+│   │   │   └── auth.js         # JWT + pre-auth (2FA) + requireAuth + allowRoles (RBAC)
 │   │   ├── 📂 routes/
-│   │   │   ├── auth.js         # POST /api/auth/login | GET /me | POST /logout
+│   │   │   ├── auth.js         # login / 2fa setup-verify / me / logout
 │   │   │   ├── queue.js        # /api/queue/* (เพิ่ม/เลื่อน/ล้าง)
 │   │   │   └── users.js        # /api/users/* (admin เท่านั้น)
+│   │   ├── 📂 services/
+│   │   │   └── twofa.service.js    # TOTP (otplib) + QR + backup codes
 │   │   └── 📂 utils/
-│   │       └── async-handler.js
+│   │       ├── async-handler.js
+│   │       └── crypto.js           # เข้ารหัส TOTP secret (AES-256-GCM)
+│   ├── Dockerfile              # 🐳 image backend
 │   ├── package.json
 │   └── package-lock.json
-├── 📂 frontend/                # 🌸 Vue 3 + Vite
+├── 📂 frontend/                # 🌸 Vue 3 + Vite + nginx — container: frontend
+│   ├── Dockerfile              # 🐳 build Vue -> nginx (multi-stage)
+│   ├── nginx.conf              # เสิร์ฟ static + proxy /api -> backend:3000
 │   ├── index.html
 │   ├── vite.config.js          # dev proxy /api → localhost:3000
 │   ├── package.json
@@ -142,20 +202,20 @@ npm run build      # สร้างไฟล์ที่ frontend/dist
 │   └── 📂 src/
 │       ├── main.js / App.vue / style.css
 │       ├── api.js              # ตัวเรียก REST API
-│       ├── 📂 store/auth.js    # สถานะผู้ใช้ + login/logout
+│       ├── 📂 store/auth.js    # สถานะผู้ใช้ + login/logout/2FA
 │       ├── 📂 router/index.js  # guard ตามบทบาท
 │       ├── 📂 components/TopBar.vue
 │       └── 📂 views/
 │           ├── LoginView.vue       # หน้าเข้าสู่ระบบ
+│           ├── Setup2FA.vue        # สแกน QR + ตั้งค่า 2FA (ครั้งแรก)
+│           ├── Verify2FA.vue       # ยืนยัน 2FA ตอน login
 │           ├── QueueBoardView.vue  # กระดานคิว (สิทธิ์ตามบทบาท)
 │           └── UsersView.vue       # จัดการผู้ใช้ (admin)
-├── 📄 Dockerfile               # 🐳 multi-stage: build Vue → runtime Express
-├── 📄 docker-compose.yml       # container db + frontend
+├── 📄 docker-compose.yml       # container db + backend + frontend
 ├── 📄 .env.example             # ตัวอย่าง environment variables
 ├── 📄 README.md
 ├── 📄 CLAUDE.md
-├── 📄 LICENSE
-└── 📄 .gitignore / .dockerignore
+└── 📄 LICENSE
 ```
 
 ---

@@ -1,0 +1,7 @@
+# Backend .dockerignore
+node_modules
+*.log
+.env
+.env.*
+Dockerfile
+.dockerignore
